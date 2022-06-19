@@ -1,1 +1,1 @@
-gradlew jar --info
+gradlew jar

@@ -5,20 +5,19 @@ import arc.math.geom.*;
 import arc.struct.*;
 import arc.util.*;
 
+import data.PlayerData;
 import mindustry.game.*;
 import mindustry.gen.*;
 
 public class HexData {
     // All hexes on the map. No order
-    private Seq<Hex> hexes = new Seq<>();
+    private final Seq<Hex> hexes = new Seq<>();
     // Maps world pos -> hex
-    private IntMap<Hex> hexPos = new IntMap<>();
+    private final IntMap<Hex> hexPos = new IntMap<>();
     // Maps team ID -> player
-    private IntMap<Player> teamMap = new IntMap<>();
+    private final IntMap<Player> teamMap = new IntMap<>();
     // Maps team ID -> list of controlled hexes
-    private IntMap<Seq<Hex>> control = new IntMap<>();
-    // Data of specific teams
-    private HexTeam[] teamData = new HexTeam[256];
+    private final IntMap<Seq<Hex>> control = new IntMap<>();
 
     public void updateControl() {
         hexes.each(Hex::updateController);
@@ -38,30 +37,28 @@ public class HexData {
         for (Player player : Groups.player) {
             if (player.dead()) continue;
 
-            HexTeam team = data(player);
+            PlayerData.HexInfo info = PlayerData.get(player).hexInfo;
             Hex newHex = hexes.min(h -> player.dst2(h.wx, h.wy));
 
-            if (team.location != newHex) {
-                team.location = newHex;
-                team.progressPercent = newHex.getProgressPercent(player.team());
-                team.lastCaptured = newHex.controller == player.team();
+            if (info.location != newHex) {
+                info.location = newHex;
+                info.progressPercent = newHex.getProgressPercent(player.team());
+                info.lastCaptured = newHex.controller == player.team();
                 Events.fire(new HexMoveEvent(player));
             }
 
             float currPercent = newHex.getProgressPercent(player.team());
-            int lp = (int)(team.progressPercent);
+            int lp = (int)(info.progressPercent);
             int np = (int)(currPercent);
-            team.progressPercent = currPercent;
+            info.progressPercent = currPercent;
 
             if (np != lp) {
                 Events.fire(new ProgressIncreaseEvent(player, currPercent));
             }
 
             boolean captured = newHex.controller == player.team();
-            if (team.lastCaptured != captured) {
-                team.lastCaptured = captured;
-                Log.info("TEST!");
-                Log.info(captured);
+            if (info.lastCaptured != captured) {
+                info.lastCaptured = captured;
                 if (captured && !newHex.hasCore()) {
                     Events.fire(new HexCaptureEvent(player, newHex));
                 }
@@ -86,15 +83,6 @@ public class HexData {
     @Nullable
     public Hex getHex(int position){
         return hexPos.get(position);
-    }
-
-    public HexTeam data(Player player){
-        return data(player.team());
-    }
-
-    public HexTeam data(Team team){
-        if (teamData[team.id] == null) teamData[team.id] = new HexTeam();
-        return teamData[team.id];
     }
 
     public static class HexTeam {

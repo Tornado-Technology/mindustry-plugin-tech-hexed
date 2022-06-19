@@ -52,7 +52,7 @@ public class HexedMod extends Plugin {
     private final static int timerBoard = 0, timerUpdate = 1, timerWinCheck = 2;
 
     private final Rules rules = new Rules();
-    private Interval interval = new Interval(5);
+    private final Interval interval = new Interval(5);
 
     private HexData hexData;
     private boolean restarting = false, registered = false;
@@ -176,7 +176,7 @@ public class HexedMod extends Plugin {
 
             if (hex != null) {
                 loadout(player, hex.x, hex.y);
-                Core.app.post(() -> hexData.data(player).chosen = false);
+                Core.app.post(() ->  PlayerData.get(player).hexInfo.chosen = false);
                 hex.findController();
             } else {
                 Call.infoMessage(event.player.con, "There are currently no empty hex spaces available.\nAssigning into spectator mode.");
@@ -184,7 +184,7 @@ public class HexedMod extends Plugin {
                 player.team(derelict);
             }
 
-            hexData.data(event.player).lastMessage.reset();
+            PlayerData.get(player).hexInfo.lastMessage.reset();
         });
 
         Events.on(PlayerLeave.class, (event) -> {
@@ -211,19 +211,14 @@ public class HexedMod extends Plugin {
             kill(player, false);
         });
 
-        Events.on(ProgressIncreaseEvent.class, (event) -> {
-            updateText(event.player);
-        });
+        Events.on(ProgressIncreaseEvent.class, (event) -> updateText(event.player));
 
         Events.on(HexCaptureEvent.class, (event) -> {
             updateText(event.player);
-            Log.info("Cptured");
             world.tile(event.hex.x, event.hex.y).setNet(Blocks.coreShard, event.player.team(), 0);
         });
 
-        Events.on(HexMoveEvent.class, (event) -> {
-            updateText(event.player);
-        });
+        Events.on(HexMoveEvent.class, (event) -> updateText(event.player));
         // endregion
 
         // region NetServer
@@ -235,24 +230,26 @@ public class HexedMod extends Plugin {
             return "[coral][[" + player.coloredName() + "[coral]]:[white] " + message;
         };
 
+
         TeamAssigner prev = netServer.assigner;
         netServer.assigner = (player, players) -> {
             Seq<Player> arr = Seq.with(players);
 
-            if (gameActive()) {
-                // Pick first inactive team
-                for (Team team : Team.all) {
-                    if (team.id > 5 && !team.active() && !arr.contains(p -> p.team() == team) && !hexData.data(team).dying && !hexData.data(team).chosen) {
-                        hexData.data(team).chosen = true;
-                        return team;
-                    }
-                }
-                Call.infoMessage(player.con, "There are currently no empty hex spaces available.\nAssigning into spectator mode.");
-                return derelict;
-            } else {
+            if (!gameActive()) {
                 return prev.assign(player, players);
             }
+
+            // Pick first inactive team
+            for (Team team : Team.all) {
+                if (team.id > 5 && !team.active() && Utils.playerInTeam(team) == 0) {
+                    return team;
+                }
+            }
+
+            Call.infoMessage(player.con, "There are currently no empty hex spaces available.\nAssigning into spectator mode.");
+            return derelict;
         };
+
         // endregion
 
         hexData = new HexData();
@@ -280,9 +277,7 @@ public class HexedMod extends Plugin {
         handler.removeCommand("votekick");
 
         // Command: /discord
-        handler.<Player>register("discord", "Discord link", (args, player) -> {
-            player.sendMessage("[blue]\uE80DDiscord: [white]" + discorsLink);
-        });
+        handler.<Player>register("discord", "Discord link", (args, player) -> player.sendMessage("[blue]\uE80DDiscord: [white]" + discorsLink));
 
         // Command: /spectate
         handler.<Player>register("spectate", "Enter spectator mode. This destroys your base.", (args, player) -> {
@@ -305,13 +300,11 @@ public class HexedMod extends Plugin {
         });
 
         // Command: /leaderboard
-        handler.<Player>register("leaderboard", "Display the leaderboard", (args, player) -> {
-            player.sendMessage(getLeaderboard());
-        });
+        handler.<Player>register("leaderboard", "Display the leaderboard", (args, player) -> player.sendMessage(getLeaderboard()));
 
         // Command: /hexstatus
         handler.<Player>register("hexstatus", "Get hex status at your position.", (args, player) -> {
-            Hex hex = hexData.data(player).location;
+            Hex hex = PlayerData.get(player).hexInfo.location;
             if (hex != null) {
                 hex.updateController();
                 StringBuilder builder = new StringBuilder();
@@ -329,9 +322,7 @@ public class HexedMod extends Plugin {
         });
 
         // Command: /respawn
-        handler.<Player>register("respawn", "Destroys all buildings and transfers to the new core", (args, player) -> {
-            respawn(player, false);
-        });
+        handler.<Player>register("respawn", "Destroys all buildings and transfers to the new core", (args, player) -> respawn(player, false));
 
         // Command: /join
         handler.<Player>register("join", "Accepts an invitation to join the team", (args, player) ->{
@@ -470,7 +461,7 @@ public class HexedMod extends Plugin {
 
         if (hex != null) {
             loadout(player, hex.x, hex.y);
-            Core.app.post(() -> hexData.data(player).chosen = false);
+            Core.app.post(() ->  PlayerData.get(player).hexInfo.chosen = false);
             hex.findController();
         } else {
             Call.infoMessage(player.con, "There are currently no empty hex spaces available.\nAssigning into spectator mode.");
@@ -478,7 +469,7 @@ public class HexedMod extends Plugin {
             player.team(derelict);
         }
 
-        hexData.data(player).lastMessage.reset();
+        PlayerData.get(player).hexInfo.lastMessage.reset();
     }
     // endregion
 
@@ -527,7 +518,7 @@ public class HexedMod extends Plugin {
         Seq<Team> used = new Seq<>();
         for (Player player : hexData.getLeaderboard()) {
             Team team = player.team();
-            String name = "";
+            String name;
 
             if (used.contains(team)) {
                 continue;
@@ -550,7 +541,7 @@ public class HexedMod extends Plugin {
     }
 
     void updateText(Player player){
-        HexTeam team = hexData.data(player);
+        PlayerData.HexInfo team =  PlayerData.get(player).hexInfo;
 
         StringBuilder message = new StringBuilder("[white]Hex #" + team.location.id + "\n");
 
@@ -635,8 +626,8 @@ public class HexedMod extends Plugin {
     }
 
     void killTiles(Team team) {
-        hexData.data(team).dying = true;
-        Time.runTask(8f, () -> hexData.data(team).dying = false);
+        PlayerData.get(player).hexInfo.dying = true;
+        Time.runTask(8f, () ->  PlayerData.get(player).hexInfo.dying = false);
         for (int x = 0; x < world.width(); x++) {
             for (int y = 0; y < world.height(); y++) {
                 Tile tile = world.tile(x, y);

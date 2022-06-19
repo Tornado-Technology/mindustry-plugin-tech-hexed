@@ -6,13 +6,9 @@ import arc.struct.*;
 
 import mindustry.world.*;
 
-public class HexedGenerator implements Cons<Tiles> {
+public class HexedGenerator {
     public int width = Hex.size;
     public int height = Hex.size;
-
-    @Override
-    public void get(Tiles tiles) {
-    }
 
     public IntSeq getHex(){
         IntSeq array = new IntSeq();
