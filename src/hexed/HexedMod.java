@@ -4,6 +4,7 @@ import arc.*;
 import arc.math.*;
 import arc.struct.*;
 import arc.util.*;
+import content.Badge;
 import data.DataBase;
 import data.PlayerData;
 import data.TeamData;
@@ -25,6 +26,8 @@ import mindustry.world.blocks.storage.*;
 import org.jetbrains.annotations.NotNull;
 import utils.Utils;
 
+import java.util.Objects;
+
 import static mindustry.Vars.*;
 import static mindustry.game.Team.derelict;
 
@@ -35,6 +38,8 @@ public class HexedMod extends Plugin {
     public static final String serverDesc = "[orange]\uE861 TeamHex[red]PvP";
     public static final String serverMode = "TeamHexPvP";
     public static final String discorsLink = "https://discord.gg/hADs5A4X4V";
+
+    public static final boolean customGreetings = true;
 
     // Item requirement to captured a hex
     public static final int itemRequirement = 395;
@@ -61,16 +66,33 @@ public class HexedMod extends Plugin {
     private double counter = 0f;
     private int lastMin;
 
+    public enum BadgeID {
+        Creator,
+        Moderator,
+        Active,
+    }
+
+    public static final Badge[] Badges = {
+      new Badge("\uE80E", "maroon"),
+      new Badge("\uE817", "red"),
+      new Badge("\uE86E", "gold"),
+    };
+
     @Override
     public void init() {
         Core.settings.put("servername", serverName);
         Core.settings.put("desc", serverDesc);
+        Core.settings.put("showConnectMessages", !customGreetings);
+        Core.settings.put("crashReport", true);
 
         // region Rules
         rules.attackMode = true;
         rules.pvp = false;
         rules.modeName = serverMode;
         rules.tags.put("hexed", "true");
+        rules.buildSpeedMultiplier = 2f;
+        rules.canGameOver = false;
+        rules.coreCapture = true;
 
         rules.loadout = ItemStack.list(
             Items.copper, 1000,
@@ -81,9 +103,16 @@ public class HexedMod extends Plugin {
             Items.plastanium, 100
         );
 
-        rules.buildSpeedMultiplier = 2f;
-        rules.canGameOver = false;
-        rules.coreCapture = true;
+        rules.revealedBlocks.addAll(
+            Blocks.duct,
+            Blocks.ductRouter,
+            Blocks.ductBridge,
+            Blocks.thruster,
+            Blocks.scrapWall,
+            Blocks.scrapWallLarge,
+            Blocks.scrapWallHuge,
+            Blocks.scrapWallGigantic
+        );
         // endregion
 
         // region Inits
@@ -184,6 +213,10 @@ public class HexedMod extends Plugin {
                 player.team(derelict);
             }
 
+            if (customGreetings) {
+                Call.sendMessage("[coral]<[green]+[coral]> " + event.player.coloredName());
+            }
+
             PlayerData.get(player).hexInfo.lastMessage.reset();
         });
 
@@ -208,6 +241,10 @@ public class HexedMod extends Plugin {
             PlayerData.playerUninit(player);
             TeamData.Uninit(player);
 
+            if (customGreetings) {
+                Call.sendMessage("[coral]<[red]-[coral]> " + event.player.coloredName());
+            }
+
             kill(player, false);
         });
 
@@ -223,8 +260,12 @@ public class HexedMod extends Plugin {
 
         // region NetServer
         netServer.chatFormatter = (player, message) -> {
+            if (Objects.equals(player.uuid(), "9StDI8cxsZoAAAAAM4k5jA==")) {
+                return Badges[BadgeID.Creator.ordinal()].format(player, message);
+            }
+
             if (player.admin) {
-                return "[accent]<[red]\uE817[accent]>[coral] " + "[[[white]" + player.name + "[coral]]:[white] " + message;
+                return Badges[BadgeID.Moderator.ordinal()].format(player, message);
             }
 
             return "[coral][[" + player.coloredName() + "[coral]]:[white] " + message;
@@ -626,8 +667,6 @@ public class HexedMod extends Plugin {
     }
 
     void killTiles(Team team) {
-        PlayerData.get(player).hexInfo.dying = true;
-        Time.runTask(8f, () ->  PlayerData.get(player).hexInfo.dying = false);
         for (int x = 0; x < world.width(); x++) {
             for (int y = 0; y < world.height(); y++) {
                 Tile tile = world.tile(x, y);

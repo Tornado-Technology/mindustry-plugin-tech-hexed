@@ -85,15 +85,6 @@ public class HexData {
         return hexPos.get(position);
     }
 
-    public static class HexTeam {
-        public boolean dying;
-        public boolean chosen;
-        public @Nullable Hex location;
-        public float progressPercent;
-        public boolean lastCaptured;
-        public Timekeeper lastMessage = new Timekeeper(1);
-    }
-
     public static class HexCaptureEvent {
         public final Player player;
         public final Hex hex;

@@ -76,7 +76,6 @@ public class PlayerData {
     }
 
     public class HexInfo {
-        public boolean dying;
         public boolean chosen;
         public @Nullable Hex location;
         public float progressPercent;

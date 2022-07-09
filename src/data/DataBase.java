@@ -1,15 +1,13 @@
 package data;
 
 import arc.util.Log;
-import arc.util.serialization.*;
-import arc.util.serialization.Json.*;
+
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class DataBase {
 
     public static void Init() {
         Log.info("DataBase initialized successfully!");
     }
-
-    public Json json;
-
 }
