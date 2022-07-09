@@ -429,14 +429,14 @@ public class HexedMod extends Plugin {
             String name = args[1];
 
             if (Utils.playerFind(name) == null) {
-                player.sendMessage("[coral]\"[white]" + name + "[coral]\"[red] spectator. You cannot work with that command!");
+                player.sendMessage("[coral]\"[white]" + name + "[coral]\"[red] doesn't exist! ");
                 return;
             }
 
             Player findePlayer = Utils.playerFind(name);
 
             if (findePlayer.team() == derelict) {
-                player.sendMessage("[coral]\"[white]" + name + "[coral]\"[red] doesn't exist!");
+                player.sendMessage("[coral]\"[white]" + name + "[coral]\"[red] spectator. You cannot work with that command!");
                 return;
             }
 

@@ -1,10 +1,5 @@
 package content;
-
-import arc.struct.Seq;
 import mindustry.gen.Player;
-
-import java.util.HashMap;
-import java.util.Map;
 
 public class Badge {
 

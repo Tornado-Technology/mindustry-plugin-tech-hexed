@@ -56,11 +56,11 @@ public class Utils {
     public static Player playerFind(String name) {
         for (Player pl : Groups.player) {
 
-            if (pl.name.equalsIgnoreCase(name)) {
+            if (pl.name.equals(name)) {
                 return pl;
             }
 
-            if (Strings.stripColors(pl.name).equalsIgnoreCase(name)) {
+            if (Strings.stripColors(pl.name).equals(name)) {
                 return pl;
             }
         }

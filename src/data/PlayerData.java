@@ -71,7 +71,7 @@ public class PlayerData {
         }
 
         player.sendMessage("[coral]\"" + request.coloredName() + "[coral]\" [white]The player was invited to");
-        request.sendMessage("You were invited to join the [coral]\"" + Utils.teamToString(player.team()) + "[coral]\"[white]\n Type \"/team join\" to accept the invitation or \"/team reject\" to reject the offer");
+        request.sendMessage("You were invited to join the [coral]\"" + Utils.teamToString(player.team()) + "[coral]\"[white]\n Type \"/join\" to accept the invitation or \"/reject\" to reject the offer");
         requestData.teamRequest = player;
     }
 
