@@ -94,6 +94,7 @@ public class HexedMod extends Plugin {
         rules.modeName = serverMode;
         rules.tags.put("hexed", "true");
         rules.buildSpeedMultiplier = 2f;
+        rules.enemyCoreBuildRadius = 35f;
         rules.canGameOver = false;
         rules.coreCapture = true;
 
@@ -206,6 +207,10 @@ public class HexedMod extends Plugin {
             if (!gameActive() || event.player.team() == derelict) return;
             Player player = event.player;
 
+            if (customConnectMessages) {
+                Call.sendMessage("[coral]<[green]+[coral]> " + event.player.coloredName());
+            }
+
             PlayerData.playerInit(event.player);
             TeamData.teamInit(event.player);
 
@@ -222,10 +227,6 @@ public class HexedMod extends Plugin {
                 Call.infoMessage(event.player.con, "There are currently no empty hex spaces available.\nAssigning into spectator mode.");
                 player.unit().kill();
                 player.team(derelict);
-            }
-
-            if (customConnectMessages) {
-                Call.sendMessage("[coral]<[green]+[coral]> " + event.player.coloredName());
             }
 
             PlayerData.get(player).hexInfo.lastMessage.reset();
@@ -338,6 +339,13 @@ public class HexedMod extends Plugin {
         Log.info("&ly--SERVER RESTARTING--");
         Time.runTask(60f * 10f, () -> {
             netServer.kickAll(KickReason.serverRestarting);
+
+            // Clean building data
+            for (Player player : Groups.player) {
+                Team team = player.team();
+                team.data().blocks.clear();
+            }
+
             Time.runTask(5f, () -> {
                 net.closeServer();
                 state.set(State.menu);
@@ -612,7 +620,7 @@ public class HexedMod extends Plugin {
         } else if(team.location.controller == player.team()) {
             message.append("[yellow][[Captured]");
         } else if(team.location != null && team.location.controller != null && hexData.getPlayer(team.location.controller) != null) {
-            message.append("[#").append(team.location.controller.color).append("]Captured by ").append(getTeamName(hexData.getPlayer(team.location.controller)));
+            message.append("Captured by ").append(getTeamName(hexData.getPlayer(team.location.controller)));
         } else {
             message.append("<Unknown>");
         }
@@ -731,7 +739,7 @@ public class HexedMod extends Plugin {
         if (Utils.playerInTeam(team) > 1) {
             return "[#" + team.color + "]Team#" + team.id;
         } else {
-            return Utils.getFirstPlayer(team).name;
+            return Utils.getFirstPlayer(team).coloredName();
         }
     }
 }
