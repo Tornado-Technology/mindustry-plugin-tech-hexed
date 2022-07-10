@@ -28,6 +28,10 @@ public class PlayerData {
         Log.info("PlayerData initialized successfully!");
     }
 
+    public static void clear() {
+        playerData.clear();
+    }
+
     public static void playerInit(Player player) {
         if (get(player) == null) {
             Log.info("Player registered: " + player.name);

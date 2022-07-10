@@ -29,6 +29,7 @@ import utils.Utils;
 import java.util.Objects;
 
 import static mindustry.Vars.*;
+import static mindustry.Vars.player;
 import static mindustry.game.Team.derelict;
 
 public class HexedMod extends Plugin {
@@ -37,11 +38,13 @@ public class HexedMod extends Plugin {
     public static final String serverName = "[red]\uE83A TechHexes";
     public static final String serverDesc = "[orange]\uE861 TeamHex[red]PvP";
     public static final String serverMode = "TeamHexPvP";
-    public static final String discorsLink = "https://discord.gg/hADs5A4X4V";
+    public static final String discordLink = "https://discord.gg/hADs5A4X4V";
 
-    public static final boolean customGreetings = true;
+    public static final boolean customConnectMessages = true;
+    public static final boolean welcomeMessage = true;
+    public static final boolean captureCore = true;
 
-    // Item requirement to captured a hex
+    // Item requirement to capture a hex
     public static final int itemRequirement = 395;
 
     // region Time
@@ -78,14 +81,14 @@ public class HexedMod extends Plugin {
       new Badge("\uE86E", "gold"),
     };
 
-    @Override
-    public void init() {
+    private void coreSettings() {
         Core.settings.put("servername", serverName);
         Core.settings.put("desc", serverDesc);
-        Core.settings.put("showConnectMessages", !customGreetings);
+        Core.settings.put("showConnectMessages", !customConnectMessages);
         Core.settings.put("crashReport", true);
+    }
 
-        // region Rules
+    private void rulesSettings() {
         rules.attackMode = true;
         rules.pvp = false;
         rules.modeName = serverMode;
@@ -94,15 +97,19 @@ public class HexedMod extends Plugin {
         rules.canGameOver = false;
         rules.coreCapture = true;
 
+        // region Loadout
         rules.loadout = ItemStack.list(
             Items.copper, 1000,
             Items.lead, 1000,
             Items.graphite, 200,
             Items.silicon, 200,
+            Items.metaglass, 120,
             Items.titanium, 250,
             Items.plastanium, 100
         );
+        // endregion
 
+        // region RevealedBlocks
         rules.revealedBlocks.addAll(
             Blocks.duct,
             Blocks.ductRouter,
@@ -114,65 +121,69 @@ public class HexedMod extends Plugin {
             Blocks.scrapWallGigantic
         );
         // endregion
+    }
 
-        // region Inits
+    @Override
+    public void init() {
+        coreSettings();
+        rulesSettings();
+
         DataBase.Init();
         PlayerData.Init();
         TeamData.Init();
-        // endregion
 
         start = Schematics.readBase64("bXNjaAF4nE1SW27bMBAckpJFUnKCHMQfac/REwT9YGS2MKCIgiQn8NWLAO4ONx8hJA33MbPkrtDj0aGZ01tG9/zjJx/057yN62XZL2UGcJjSa5422Jffj3gay7Lk9fSRpuk0pfVvRv/NBT+W+T3fygqX1hH9ViTptKQ5TxjWvKSLWOUy7+i2Me17XhGX8iH0uZwzhrGs+TRfxylfNzx9Y38VO7zl+Swkf52nkrjrKfknjXtZb+heq+YN7Zam9yKn/yUvDKwRcKirASzvpdApeI0FJgO9WgN5tI0TcHBWoPKM8gx5jPVwzHyAMVXONDXqCFZB6K1AQ02LlmJWxayKWYoxFuAOAlGtgee2OLICbyBiTqUdVTsK+6pUS9Itr5cKHaot/gCWtlGsBqaXT2wlaAbxD+Yuq2Y+8GwtCUeBhuItom/unzUsnbj/+yrTanKt2gs01AN3VA61TzWjq/0XkP4cwNOKv+Pl6DwyxeuMvDbFC9MSOgWvKYH39+yG4ZR0WNIfxwhVgw42KD0oPZDOWOCcAudEqw426Lii9jcqLyovatnIP+E/QcxTaQ==");
 
         // region Update
         Events.run(Trigger.update, () -> {
-            if (gameActive()) {
-                hexData.updateStats();
-
-                for (Player player : Groups.player) {
-                    if (player.team() != derelict && player.team().cores().isEmpty()) {
-                        player.clearUnit();
-                        kill(player, true);
-                        Call.sendMessage("[yellow](!)[] [accent]" + player.name + "[lightgray] has been eliminated![yellow] (!)");
-                        Call.infoMessage(player.con, "Your cores have been destroyed. You are defeated.");
-                        player.team(derelict);
-                    }
-
-                    if (player.team() == derelict) {
-                        player.clearUnit();
-                    } else if(hexData.getControlled(player).size == hexData.hexes().size) {
-                        endGame();
-                        break;
-                    }
-                }
-
-                int minsToGo = (int)(roundTime - counter) / 3600;
-                if (minsToGo != lastMin) {
-                    lastMin = minsToGo;
-                }
-
-                if (interval.get(timerBoard, leaderboardTime)) {
-                    Call.infoToast(getLeaderboard(), 15f);
-                }
-
-                if (interval.get(timerUpdate, updateTime)) {
-                    hexData.updateControl();
-                }
-
-                if (interval.get(timerWinCheck, 120)) {
-                    Seq<Player> players = hexData.getLeaderboard();
-                    if (!players.isEmpty() && hexData.getControlled(players.first()).size >= winCondition && players.size > 1 && hexData.getControlled(players.get(1)).size <= 1){
-                        endGame();
-                    }
-                }
-
-                counter += Time.delta;
-
-                // Kick everyone and restart w/ the script
-                if (counter > roundTime && !restarting) {
-                    endGame();
-                }
-            } else {
+            // Update only if game running
+            if (!gameActive()) {
                 counter = 0;
+                return;
+            }
+
+            hexData.updateStats();
+
+            for (Player player : Groups.player) {
+                if (player.team() != derelict && player.team().cores().isEmpty()) {
+                    player.clearUnit();
+                    kill(player, true);
+                    Call.sendMessage("[yellow](!)[] [accent]" + player.name + "[lightgray] has been eliminated![yellow] (!)");
+                    Call.infoMessage(player.con, "Your cores have been destroyed. You are defeated.");
+                    player.team(derelict);
+                }
+
+                if(hexData.getControlled(player).size == hexData.hexes().size) {
+                    gameEnd();
+                    break;
+                }
+            }
+
+            int minutesToGo = (int)(roundTime - counter) / 3600;
+            if (minutesToGo != lastMin) {
+                lastMin = minutesToGo;
+            }
+
+            if (interval.get(timerBoard, leaderboardTime)) {
+                Call.infoToast(getLeaderboard(), 15f);
+            }
+
+            if (interval.get(timerUpdate, updateTime)) {
+                hexData.updateControl();
+            }
+
+            if (interval.get(timerWinCheck, 120)) {
+                Seq<Player> players = hexData.getLeaderboard();
+                if (!players.isEmpty() && hexData.getControlled(players.first()).size >= winCondition && players.size > 1 && hexData.getControlled(players.get(1)).size <= 1){
+                    gameEnd();
+                }
+            }
+
+            counter += Time.delta;
+
+            // Kick everyone and restart game
+            if (counter > roundTime && !restarting) {
+                gameEnd();
             }
         });
         // endregion
@@ -198,7 +209,7 @@ public class HexedMod extends Plugin {
             PlayerData.playerInit(event.player);
             TeamData.teamInit(event.player);
 
-            player.sendMessage("Welcome to " + serverName + " \n[blue]\uE80DDiscord: [white]" + discorsLink);
+            player.sendMessage("Welcome to " + serverName + " \n[blue]\uE80DDiscord: [white]" + discordLink);
             Seq<Hex> copy = hexData.hexes().copy();
             copy.shuffle();
             Hex hex = copy.find(h -> h.controller == null && h.spawnTime.get());
@@ -213,7 +224,7 @@ public class HexedMod extends Plugin {
                 player.team(derelict);
             }
 
-            if (customGreetings) {
+            if (customConnectMessages) {
                 Call.sendMessage("[coral]<[green]+[coral]> " + event.player.coloredName());
             }
 
@@ -241,7 +252,7 @@ public class HexedMod extends Plugin {
             PlayerData.playerUninit(player);
             TeamData.Uninit(player);
 
-            if (customGreetings) {
+            if (customConnectMessages) {
                 Call.sendMessage("[coral]<[red]-[coral]> " + event.player.coloredName());
             }
 
@@ -259,18 +270,7 @@ public class HexedMod extends Plugin {
         // endregion
 
         // region NetServer
-        netServer.chatFormatter = (player, message) -> {
-            if (Objects.equals(player.uuid(), "9StDI8cxsZoAAAAAM4k5jA==")) {
-                return Badges[BadgeID.Creator.ordinal()].format(player, message);
-            }
-
-            if (player.admin) {
-                return Badges[BadgeID.Moderator.ordinal()].format(player, message);
-            }
-
-            return "[coral][[" + player.coloredName() + "[coral]]:[white] " + message;
-        };
-
+        netServer.chatFormatter = (player, message) -> format(player, message);
 
         TeamAssigner prev = netServer.assigner;
         netServer.assigner = (player, players) -> {
@@ -293,19 +293,74 @@ public class HexedMod extends Plugin {
 
         // endregion
 
-        hexData = new HexData();
-        hexData.initHexes(new HexedGenerator().getHex());
+        gameStart();
+    }
 
+    public static String format(Player player, String message) {
+        if (player.admin) {
+            return HexedMod.Badges[HexedMod.BadgeID.Moderator.ordinal()].format(player, message);
+        }
+
+        return "[coral][[" + player.coloredName() + "[coral]]:[white] " + message;
+    }
+
+    public void gameStart() {
+        Log.info("&ly--SERVER STARTING--");
+        hexData = new HexData();
+        hexData.initHexes(HexedGenerator.getHex());
         HexedMap.load(rules);
     }
 
+    public void gameEnd() {
+        if (restarting) return;
+
+        restarting = true;
+
+        Seq<Player> players = hexData.getLeaderboard();
+        StringBuilder builder = new StringBuilder();
+        for(int i = 0; i < players.size && i < 3; i++){
+            if(hexData.getControlled(players.get(i)).size > 1){
+                builder.append("[yellow]").append(i + 1).append(".[accent] ").append(players.get(i).name).append("[lightgray] (x").append(hexData.getControlled(players.get(i)).size).append(")[]\n");
+            }
+        }
+
+        if (!players.isEmpty()) {
+            boolean dominated = hexData.getControlled(players.first()).size == hexData.hexes().size;
+
+            for (Player player : Groups.player) {
+                Call.infoMessage(player.con,
+                    "[accent]--ROUND OVER--\n\n[lightgray]" +
+                    (player == players.first() ? "[accent]You[] were" : "[yellow]" + players.first().name + "[lightgray] was") +
+                        " victorious, with [accent]" + hexData.getControlled(players.first()).size + "[lightgray] hexes conquered." + (dominated ? "" : "\n\nFinal scores:\n" + builder));
+            }
+        }
+
+        Log.info("&ly--SERVER RESTARTING--");
+        Time.runTask(60f * 10f, () -> {
+            netServer.kickAll(KickReason.serverRestarting);
+            Time.runTask(5f, () -> {
+                net.closeServer();
+                state.set(State.menu);
+                counter = 0;
+
+                PlayerData.clear();
+                TeamData.clear();
+
+                gameStart(); // Start server
+            });
+        });
+    }
+
+    public boolean gameActive() {
+        return state.rules.tags.getBool("hexed") && !state.is(State.menu);
+    }
 
     // region Commands
     @Override
     public void registerServerCommands(@NotNull CommandHandler handler){
         handler.register("countdown", "Get the hexed restart countdown.", (args) -> Log.info("Time until round ends: &lc@ minutes", (int)(roundTime - counter) / 3600));
-        handler.register("end", "End the game.", (args) -> endGame());
-        handler.register("restart", "Restart the server.", (args) -> System.exit(2));
+        handler.register("end", "End the game.", (args) -> gameEnd());
+        handler.register("restart", "Restart the server.", (args) -> gameEnd());
     }
 
     @Override
@@ -318,7 +373,7 @@ public class HexedMod extends Plugin {
         handler.removeCommand("votekick");
 
         // Command: /discord
-        handler.<Player>register("discord", "Discord link", (args, player) -> player.sendMessage("[blue]\uE80DDiscord: [white]" + discorsLink));
+        handler.<Player>register("discord", "Discord link", (args, player) -> player.sendMessage("[blue]\uE80DDiscord: [white]" + discordLink));
 
         // Command: /spectate
         handler.<Player>register("spectate", "Enter spectator mode. This destroys your base.", (args, player) -> {
@@ -514,44 +569,8 @@ public class HexedMod extends Plugin {
     }
     // endregion
 
-    // region Game
-    void endGame() {
-        if (restarting) return;
-
-        restarting = true;
-
-        Seq<Player> players = hexData.getLeaderboard();
-        StringBuilder builder = new StringBuilder();
-        for(int i = 0; i < players.size && i < 3; i++){
-            if(hexData.getControlled(players.get(i)).size > 1){
-                builder.append("[yellow]").append(i + 1).append(".[accent] ").append(players.get(i).name).append("[lightgray] (x").append(hexData.getControlled(players.get(i)).size).append(")[]\n");
-            }
-        }
-
-        if (!players.isEmpty()) {
-            boolean dominated = hexData.getControlled(players.first()).size == hexData.hexes().size;
-
-            for(Player player : Groups.player) {
-                Call.infoMessage(player.con, "[accent]--ROUND OVER--\n\n[lightgray]"
-                        + (player == players.first() ? "[accent]You[] were" : "[yellow]" + players.first().name + "[lightgray] was") +
-                        " victorious, with [accent]" + hexData.getControlled(players.first()).size + "[lightgray] hexes conquered." + (dominated ? "" : "\n\nFinal scores:\n" + builder));
-            }
-        }
-
-        Log.info("&ly--SERVER RESTARTING--");
-        Time.runTask(60f * 10f, () -> {
-            netServer.kickAll(KickReason.serverRestarting);
-            Time.runTask(5f, () -> System.exit(2));
-        });
-    }
-
-    public boolean gameActive() {
-        return state.rules.tags.getBool("hexed") && !state.is(State.menu);
-    }
-    // endregion
-
     // region Leaderboard
-    String getLeaderboard() {
+    public String getLeaderboard() {
         StringBuilder builder = new StringBuilder();
         builder.append("[accent]Leaderboard\n[scarlet]").append(lastMin).append("[lightgray] mins. remaining\n\n");
         int count = 0;
@@ -567,11 +586,7 @@ public class HexedMod extends Plugin {
 
             used.add(team);
 
-            if (Utils.playerInTeam(team) > 1) {
-                name = "[#" + team.color + "]Team#" + team.id;
-            } else {
-                name = Utils.getFirstPlayer(team).name;
-            }
+            name = getTeamName(team);
 
             int hexes = hexData.getControlled(player).size;
             builder.append("[yellow]").append(++count).append(".[white] ").append(name).append("[orange] (").append(hexes).append(hexes > 1 ? " hexes)" : " hex)").append("[white]\n");
@@ -581,7 +596,7 @@ public class HexedMod extends Plugin {
         return builder.toString();
     }
 
-    void updateText(Player player){
+    public void updateText(Player player){
         PlayerData.HexInfo team =  PlayerData.get(player).hexInfo;
 
         StringBuilder message = new StringBuilder("[white]Hex #" + team.location.id + "\n");
@@ -597,7 +612,7 @@ public class HexedMod extends Plugin {
         } else if(team.location.controller == player.team()) {
             message.append("[yellow][[Captured]");
         } else if(team.location != null && team.location.controller != null && hexData.getPlayer(team.location.controller) != null) {
-            message.append("[#").append(team.location.controller.color).append("]Captured by ").append(hexData.getPlayer(team.location.controller).name);
+            message.append("[#").append(team.location.controller.color).append("]Captured by ").append(getTeamName(hexData.getPlayer(team.location.controller)));
         } else {
             message.append("<Unknown>");
         }
@@ -607,28 +622,28 @@ public class HexedMod extends Plugin {
     // endregion
 
     // region Team
-    void changeTeam(Player oldTeam, Player newTeam) {
+    public void changeTeam(Player oldTeam, Player newTeam) {
         changeTeam(oldTeam.team(), newTeam.team());
     }
 
-    void changeTeam(Team oldTeam, Team newTeam) {
+    public void changeTeam(Team oldTeam, Team newTeam) {
         transferTeamItems(oldTeam, newTeam);
         changeTeamUnits(oldTeam, newTeam);
         changeTeamTiles(oldTeam, newTeam);
     }
 
-    void transferTeamItems(Team oldTeam, Team newTeam) {
+    public void transferTeamItems(Team oldTeam, Team newTeam) {
         newTeam.data().core().items.add(oldTeam.data().core().items());
         oldTeam.data().core().items().clear();
     }
 
-    void changeTeamUnits(Team oldTeam, Team newTeam) {
+    public void changeTeamUnits(Team oldTeam, Team newTeam) {
         for (Unit unit : oldTeam.data().units) {
             unit.team(newTeam);
         }
     }
 
-    void changeTeamTiles(Team oldTeam, Team newTeam) {
+    public void changeTeamTiles(Team oldTeam, Team newTeam) {
         for (int x = 0; x < world.width(); x++) {
             for (int y = 0; y < world.height(); y++) {
                 Tile tile = world.tile(x, y);
@@ -647,11 +662,11 @@ public class HexedMod extends Plugin {
     // endregion
 
     // region Kill
-    void kill(Player player, boolean forced) {
+    public void kill(Player player, boolean forced) {
         kill(player.team(), forced);
     }
 
-    void kill(Team team, boolean forced) {
+    public void kill(Team team, boolean forced) {
         if (!forced && Utils.playerInTeam(team) > 1) {
             return;
         }
@@ -660,13 +675,13 @@ public class HexedMod extends Plugin {
         killTiles(team);
     }
 
-    void killUnits(Team team) {
+    public void killUnits(Team team) {
         for (Unit unit : team.data().units) {
             unit.kill();
         }
     }
 
-    void killTiles(Team team) {
+    public void killTiles(Team team) {
         for (int x = 0; x < world.width(); x++) {
             for (int y = 0; y < world.height(); y++) {
                 Tile tile = world.tile(x, y);
@@ -683,9 +698,9 @@ public class HexedMod extends Plugin {
     }
     // endregion
 
-    void loadout(Player player, int x, int y){
+    public void loadout(Player player, int x, int y) {
         Stile coreTile = start.tiles.find(s -> s.block instanceof CoreBlock);
-        if(coreTile == null) throw new IllegalArgumentException("Schematic has no core tile. Exiting.");
+        if (coreTile == null) throw new IllegalArgumentException("Schematic has no core tile. Exiting.");
         int ox = x - coreTile.x, oy = y - coreTile.y;
         start.tiles.each(st -> {
             Tile tile = world.tile(st.x + ox, st.y + oy);
@@ -706,5 +721,17 @@ public class HexedMod extends Plugin {
                 }
             }
         });
+    }
+
+    public String getTeamName(Player player) {
+        return getTeamName(player.team());
+    }
+
+    public String getTeamName(Team team) {
+        if (Utils.playerInTeam(team) > 1) {
+            return "[#" + team.color + "]Team#" + team.id;
+        } else {
+            return Utils.getFirstPlayer(team).name;
+        }
     }
 }

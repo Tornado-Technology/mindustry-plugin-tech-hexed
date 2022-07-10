@@ -1,16 +1,13 @@
 package hexed;
 
-import arc.func.*;
 import arc.math.geom.*;
 import arc.struct.*;
 
-import mindustry.world.*;
-
 public class HexedGenerator {
-    public int width = Hex.size;
-    public int height = Hex.size;
+    public static int width = Hex.size;
+    public static int height = Hex.size;
 
-    public IntSeq getHex(){
+    public static IntSeq getHex(){
         IntSeq array = new IntSeq();
         double h = Math.sqrt(3) * Hex.spacing / 2;
 

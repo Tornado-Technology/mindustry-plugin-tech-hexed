@@ -33,6 +33,12 @@ public class TeamData {
         Log.info("TeamData initialized successfully!");
     }
 
+    public static void clear() {
+        for (int i = 0; i < teamData.length; i++) {
+            teamData[i] = new TeamData();
+        }
+    }
+
     // region team Init & Uniti
     public static void teamInit (Player player) {
         teamInit(player.team());
